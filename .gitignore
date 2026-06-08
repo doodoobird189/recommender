@@ -1,0 +1,29 @@
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ── Virtual environment ──────────────────────────────
+venv/
+.env
+.venv
+
+# ── Jupyter ──────────────────────────────────────────
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# ── Data files (too large for git) ───────────────────
+# Download instructions: see data/README.md
+data/*.csv
+data/*.parquet
+data/*.npz
+data/*.txt
+!data/README.md
+
+# ── Editor lock files ─────────────────────────────────
+data/.~lock.*
+
+# ── OS ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
