@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 import requests
+from dotenv import load_dotenv
 from scipy.sparse import load_npz
 from implicit.cpu.als import AlternatingLeastSquares
 from flask import Flask, jsonify, render_template, request
@@ -10,7 +11,9 @@ from flask import Flask, jsonify, render_template, request
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "..", "data")
 
-TMDB_API_KEY  = "bcee530206ce4a395e6b0136cc142d8e"
+load_dotenv()
+
+TMDB_API_KEY  = os.getenv("TMDB_API_KEY")
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
 # ── load everything once at startup ────────────────────────────────────────

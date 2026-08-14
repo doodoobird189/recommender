@@ -1,10 +1,14 @@
+import os
 import pandas as pd
 import numpy as np
 import requests
+from dotenv import load_dotenv
 from scipy.sparse import csr_matrix, save_npz
 from implicit.als import AlternatingLeastSquares
 
-TMDB_API_KEY = "bcee530206ce4a395e6b0136cc142d8e"
+load_dotenv()
+
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
 '''
