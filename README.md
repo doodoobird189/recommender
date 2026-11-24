@@ -4,11 +4,14 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 ![uv](https://img.shields.io/badge/deps-uv-purple)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
+[![Live demo](https://img.shields.io/badge/%F0%9F%A4%97%20live%20demo-Hugging%20Face%20Spaces-yellow)](https://doodoobird189-movie-recommender.hf.space)
 
 A movie recommender that blends **collaborative filtering** (implicit-feedback ALS on 32M MovieLens
 ratings) with a **content model** built on the MovieLens *Tag Genome*. Any visitor can pick a few
 movies and get instant, explained recommendations. Their taste is folded into the model on the fly,
 with no account and no retraining.
+
+**▶ Try it live: [doodoobird189-movie-recommender.hf.space](https://doodoobird189-movie-recommender.hf.space)** (if it has been idle, give it a moment to wake up)
 
 ![Screenshot: recommendations with "because you liked" explanations](docs/screenshot.png)
 
@@ -110,8 +113,21 @@ make docker-run       # http://localhost:8000
 ```
 
 The runtime image installs only the serving dependencies. Training libraries live in a separate
-`train` dependency group and Docker target. The container honours `$PORT`, so it deploys as-is
-to Render, Fly.io, Railway or Cloud Run.
+`train` dependency group and Docker target. The container honours `$PORT`, so it also deploys
+as-is to Render, Fly.io, Railway or Cloud Run.
+
+### Deploying (Hugging Face Spaces)
+
+The live demo is a Docker Space built from the same Dockerfile. Trained artifacts are not in git,
+so `make deploy` ([`scripts/deploy_space.py`](scripts/deploy_space.py)) stages the source, lockfile,
+artifacts and reports, adds the Space config header, and uploads it all as one commit:
+
+```bash
+uvx --from huggingface_hub hf auth login   # token with write access to the Space
+make deploy
+```
+
+The TMDB key is set as a Space **secret** (`TMDB_API_KEY`) and never leaves Hugging Face's settings.
 
 ## API
 

@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 DATA_URL := https://files.grouplens.org/datasets/movielens/ml-latest.zip
 
-.PHONY: help install download prepare train evaluate pipeline serve lint format test check docker-build docker-run docker-pipeline clean
+.PHONY: help install download prepare train evaluate pipeline serve lint format test check docker-build docker-run docker-pipeline deploy clean
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -49,6 +49,9 @@ docker-run: ## Run the web image on http://localhost:8000
 
 docker-pipeline: ## Run the offline pipeline inside Docker
 	docker compose run --rm pipeline all
+
+deploy: ## Deploy to the Hugging Face Space (needs `hf auth login` + artifacts)
+	uv run python scripts/deploy_space.py
 
 clean: ## Remove caches (keeps data and artifacts)
 	rm -rf .pytest_cache .ruff_cache **/__pycache__
