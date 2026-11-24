@@ -1,0 +1,16 @@
+# Keep the build context small: raw data is mounted at runtime, never copied
+data/
+.git/
+.github/
+.venv/
+venv/
+notebooks/
+tests/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+*.log
+Dockerfile
+docker-compose.yml

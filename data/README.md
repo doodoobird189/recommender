@@ -1,27 +1,37 @@
 # Data
 
-This directory is not tracked by git (files are too large).
+Nothing in this directory is tracked by git except this file.
 
 ## Download
 
-1. Go to https://grouplens.org/datasets/movielens/
-2. Download **ml-latest.zip** (the full dataset)
-3. Extract into this `data/` directory
+```bash
+make download        # fetches ml-latest.zip (~335 MB) from GroupLens and unzips to data/ml-latest/
+```
 
-You should end up with:
+Or manually: download **ml-latest.zip** from <https://grouplens.org/datasets/movielens/> and
+extract it here, so that you have:
+
 ```
 data/
-├── genome-scores.csv
-├── genome-tags.csv
-├── links.csv
-├── movies.csv
-├── ratings.csv
-└── tags.csv
+└── ml-latest/
+    ├── genome-scores.csv   # 18.5M (movie, tag, relevance) rows — the tag genome
+    ├── genome-tags.csv     # 1,128 tag names
+    ├── links.csv           # movieId -> imdbId / tmdbId
+    ├── movies.csv          # titles + genres
+    ├── ratings.csv         # 33.8M ratings, 1995–2023
+    └── tags.csv            # free-text user tags (unused)
 ```
 
-Then run the preprocessing script to generate the parquet files and trained model:
+## Build
 
 ```bash
-cd ../pipeline && python data_cleaning.py
-cd ../training  && OPENBLAS_NUM_THREADS=1 python als_model.py
+make pipeline        # = uv run recommender prepare && train && evaluate
 ```
+
+| Step | Writes | Notes |
+|---|---|---|
+| `prepare` | `data/processed/interactions.parquet`, `artifacts/{items.parquet,genome.npz,sample_users.parquet}` | 20-core filtering, contiguous ids, genome aligned to the catalogue |
+| `train` | `artifacts/{als_item_factors.npy,model.json}` | ALS on all interactions (~1–2 min on 12 cores) |
+| `evaluate` | `reports/{metrics.json,metrics.md}` | trains 2 more models (random + temporal split) |
+
+The data is licensed by GroupLens for non-commercial use. See `ml-latest/README.txt`.

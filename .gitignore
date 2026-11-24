@@ -1,29 +1,37 @@
-# ── Python ──────────────────────────────────────────
+# ── Python ──────────────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*.egg-info/
+build/
+dist/
 
-# ── Virtual environment ──────────────────────────────
+# ── Environments ────────────────────────────────────────────────────────────
+.venv/
 venv/
 .env
-.venv
+.env.*
+!.env.example
 
-# ── Jupyter ──────────────────────────────────────────
+# ── Tooling caches ──────────────────────────────────────────────────────────
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Jupyter ─────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
-notebooks/.ipynb_checkpoints/
 
-# ── Data files (too large for git) ───────────────────
-# Download instructions: see data/README.md
-data/*.csv
-data/*.parquet
-data/*.npz
-data/*.txt
+# ── Data & models (large; reproducible via `make download pipeline`) ───────
+data/*
 !data/README.md
+artifacts/*
+!artifacts/.gitkeep
+# reports/ IS committed: small, and the README links to it
 
-# ── Editor lock files ─────────────────────────────────
-data/.~lock.*
-
-# ── OS ────────────────────────────────────────────────
+# ── Editors / OS ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+.~lock.*
 .DS_Store
 Thumbs.db

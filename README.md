@@ -1,131 +1,173 @@
-# Movie Recommender System
+# Hybrid Movie Recommender
 
-A collaborative filtering recommender system trained on the [MovieLens](https://grouplens.org/datasets/movielens/) dataset (~33M ratings, 330K users, 86K movies), served through a Flask web app with live TMDB movie data.
+[![CI](https://github.com/doodoobird189/recommender/actions/workflows/ci.yml/badge.svg)](https://github.com/doodoobird189/recommender/actions/workflows/ci.yml)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
+![uv](https://img.shields.io/badge/deps-uv-purple)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED)
 
----
+A movie recommender that blends **collaborative filtering** (implicit-feedback ALS on 32M MovieLens
+ratings) with a **content model** built on the MovieLens *Tag Genome*. Any visitor can pick a few
+movies and get instant, explained recommendations. Their taste is folded into the model on the fly,
+with no account and no retraining.
+
+![Screenshot: recommendations with "because you liked" explanations](docs/screenshot.png)
+
+## Highlights
+
+- **Works for brand-new users.** The ALS user step is solved in closed form at request time (a
+  64×64 Cholesky solve, ~0.1 ms), so the web app needs no user database and no `implicit` at runtime.
+- **Explains every recommendation.** ALS scores decompose *exactly* into per-movie contributions
+  ([Hu et al. 2008](http://yifanhu.net/PUB/cf.pdf), §5), which drives the *"Because you liked
+  Memento & Inception"* line. When the content model drives a pick, the explanation comes from
+  genome similarity instead. Shared tags (*"non-linear"*, *"dystopia"*) come from the genome.
+- **Evaluated honestly.** Baselines, a **temporal split**, a validation window for tuning, and
+  beyond-accuracy metrics (coverage, novelty, diversity, cold-start recall). The evaluation code
+  calls the same scoring functions as the web app.
+- **Production-shaped.** `uv` project with a lockfile, `src/` layout, CLI, 40+ tests, ruff, GitHub
+  Actions CI, multi-stage Docker image (non-root, healthcheck, gunicorn).
 
 ## Results
 
-Evaluated on a held-out 20% test split across 2,000 sampled users:
+Temporal split: trained on every rating before **2020-08-28**, evaluated on what 5,000 users
+actually watched *after* that date. This is how a deployed recommender is really used: predicting
+the future from the past.
 
-| K  | Precision@K | Recall@K | NDCG@K | MAP@K  |
-|----|-------------|----------|--------|--------|
-| 5  | 0.4257      | 0.1333   | 0.4559 | 0.3550 |
-| 10 | 0.3618      | 0.2095   | 0.4246 | 0.2916 |
-| 20 | 0.2904      | 0.3096   | 0.4157 | 0.2563 |
+| Model | NDCG@10 | Recall@10 | Cold-start recall@20 | Catalogue coverage | Novelty |
+|---|---:|---:|---:|---:|---:|
+| Popularity (all-time) | 0.126 | 0.020 | 0.000 | 1.4% | 1.60 |
+| Popularity (last 12 months) | 0.212 | 0.050 | 0.000 | 1.2% | 3.07 |
+| Content only (tag genome) | 0.160 | 0.037 | **0.131** | 7.7% | **11.95** |
+| ALS only | 0.207 | 0.040 | 0.000 | **9.6%** | 3.29 |
+| **Hybrid (served, cf = 0.25)** | **0.230** | **0.052** | 0.017 | 8.6% | 4.34 |
 
----
+Full tables, including a random split and every blend weight: [`reports/metrics.md`](reports/metrics.md).
 
-## How It Works
+### What I learned
 
-```
-ratings.csv
-    │
-    ▼
-pipeline/data_cleaning.py
-    • Filter sparse users/movies (≥20 interactions)
-    • Re-encode IDs to contiguous integers
-    • Build confidence scores from ratings
-    │
-    ▼
-training/als_model.py
-    • Build user×item sparse matrix (CSR)
-    • Train Alternating Least Squares (implicit 0.7)
-    • Save model + matrix to data/
-    │
-    ▼
-app/app.py  ──►  GET /api/recommend?user_id=X
-    • Load saved model at startup
-    • Map internal IDs → movieId → tmdbId
-    • Fetch poster/title/genres from TMDB API
-    • Return JSON to frontend
-    │
-    ▼
-app/templates/index.html
-    • Dark-themed movie card grid
-    • Poster images, genre tags, TMDB rating, ALS score
-```
+1. **A trending-popularity baseline is nearly as good as ALS.** Under the temporal split,
+   "most-rated in the last 12 months" matches ALS on NDCG and *beats* it on recall. Without that
+   baseline, ALS looks far better than it is.
+2. **The evaluation protocol decides the winner.** On a random split, CF-heavy models win (ALS 0.314,
+   cf = 0.9 blend 0.317) and adding more content *hurts* (cf = 0.25: 0.216). Randomly held-out
+   ratings reward memorising co-occurrence among popular films. On the temporal split, the hybrid beats ALS by **+11% NDCG and +29% recall**.
+3. **Naive score blending silently fails.** My first hybrid z-scored both signals, and it never
+   recommended a single cold movie (cold recall exactly 0.000). Diagnosis: ALS scores are
+   heavy-tailed (top items at z ≈ 12) while genome cosine tops out at z ≈ 3.4, so ALS dominated
+   every blend. Rescaling each signal so its *top-10 mean* = 1 fixed it.
+4. **Accuracy trades off against diversity.** The content signal makes lists more on-theme
+   (intra-list diversity 0.72 → 0.47). The slider in the app shows that trade-off directly.
 
----
+The blend weight (cf = 0.25) was chosen by NDCG@10 on a **separate validation window**
+(2018-07-10 → 2020-08-28), never on the test window.
 
-## Tech Stack
+## How it works
 
-- **Model** — [implicit](https://github.com/benfred/implicit) ALS (Alternating Least Squares)
-- **Data** — [MovieLens Latest](https://grouplens.org/datasets/movielens/) + [TMDB API](https://developer.themoviedb.org/)
-- **Backend** — Flask
-- **Frontend** — Vanilla HTML/CSS/JS
-- **Data processing** — pandas, scipy sparse, pyarrow
-
----
-
-## Project Structure
-
-```
-recommender/
-├── app/
-│   ├── app.py                 # Flask API + web server
-│   └── templates/
-│       └── index.html         # Frontend UI
-├── data/                      # ← gitignored (see data/README.md)
-├── notebooks/
-│   └── explore_data.ipynb     # EDA notebook
-├── pipeline/
-│   └── data_cleaning.py       # Preprocessing + parquet export
-├── training/
-│   ├── als_model.py           # Train ALS, save model
-│   └── evaluate.py            # Precision/Recall/NDCG/MAP evaluation
-├── .gitignore
-├── requirements.txt
-└── README.md
+```mermaid
+flowchart LR
+    R[ratings.csv<br/>33.8M ratings] --> P[prepare<br/>20-core filter<br/>id encoding]
+    G[genome-scores.csv<br/>1,128 tags × 16k movies] --> P
+    P --> T[train<br/>implicit ALS<br/>64 factors]
+    P --> GA[genome.npz<br/>per-tag z-scores]
+    T --> IF[item factors]
+    IF --> E{{Engine}}
+    GA --> E
+    U[visitor's picks] --> E
+    E -->|fold-in ALS user vector| S1[CF scores]
+    E -->|taste profile · cosine| S2[content scores]
+    S1 & S2 --> B[scale-to-top + blend]
+    B --> X[top-N + explanations]
 ```
 
----
+| Component | Idea |
+|---|---|
+| **Confidence** | `c = 1 + α·rating` (Hu et al.), so every watched movie is a positive with graded confidence |
+| **ALS fold-in** | `x_u = (YᵀY + Yᵀ(Cᵤ−I)Y + λI)⁻¹ YᵀCᵤp(u)`, verified against `implicit`'s own solver in the tests |
+| **Genome profile** | Tags z-scored across the catalogue, then `Σ (rating − 2.5) · genome(movie)`, so disliked movies push away |
+| **Blend** | `w · scale(ALS) + (1 − w) · scale(content)`. Movies without genome data get a neutral content term |
+| **Explanations** | Exact per-item ALS contribution `c_i · y_tᵀA⁻¹y_i`, or genome similarity for content-driven picks |
 
-## Setup
+## Quickstart
 
-### 1. Get the data
-
-Download [MovieLens Latest](https://grouplens.org/datasets/movielens/) (`ml-latest.zip`) and extract the CSVs into `data/`.
-
-### 2. Install dependencies
+Requires [uv](https://docs.astral.sh/uv/). Docker is optional.
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+make install          # uv sync: creates .venv with Python 3.12 + all deps
+make download         # MovieLens ml-latest (~335 MB) -> data/ml-latest/
+make pipeline         # prepare -> train -> evaluate (~11 min on 12 cores)
+cp .env.example .env  # optional: add a free TMDB key for posters
+make serve            # http://127.0.0.1:5000
 ```
 
-### 3. Preprocess
+Run `make help` for all targets. Without a TMDB key the app still works and shows title cards
+instead of posters.
+
+### Docker
 
 ```bash
-cd pipeline
-python data_cleaning.py
+make docker-pipeline  # optional: run the offline pipeline in a container (data/ is mounted)
+make docker-build     # slim runtime image with artifacts baked in
+make docker-run       # http://localhost:8000
 ```
 
-### 4. Train
+The runtime image installs only the serving dependencies. Training libraries live in a separate
+`train` dependency group and Docker target. The container honours `$PORT`, so it deploys as-is
+to Render, Fly.io, Railway or Cloud Run.
+
+## API
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/recommend` | `{"liked": [movieId…]}` or `{"ratings": {movieId: 0.5–5}}`, optional `cf_weight` (0 = content … 1 = CF) and `n` |
+| `GET` | `/api/search?q=` | Title search, popularity-ranked |
+| `GET` | `/api/popular?n=&seed=` | Random draw from the 300 most-rated movies |
+| `GET` | `/api/sample-user` | A real MovieLens user's ratings, for the demo |
+| `GET` | `/api/model` | Model card + evaluation metrics |
+| `GET` | `/healthz` | Liveness |
 
 ```bash
-cd training
-OPENBLAS_NUM_THREADS=1 python als_model.py
+curl -s localhost:5000/api/recommend -H 'Content-Type: application/json' \
+     -d '{"liked": [2571, 79132, 4226], "n": 5}' | jq '.recommendations[].title'
 ```
 
-### 5. Evaluate (optional)
+## Project layout
 
-```bash
-cd training
-OPENBLAS_NUM_THREADS=1 python evaluate.py
+```
+src/recommender/
+├── cli.py          # `recommender prepare | train | evaluate | serve`
+├── config.py       # paths (env-overridable) and hyperparameters
+├── data.py         # loading, k-core filtering, encoding, random/temporal splits
+├── genome.py       # tag-genome matrix + explanation-tag filtering
+├── train.py        # ALS training (implicit)
+├── scoring.py      # ALS fold-in, content scorer, blend, top-k: shared by eval & serving
+├── evaluation.py   # metrics, baselines, weight selection, report tables
+├── engine.py       # serving engine: recommend + explain
+├── tmdb.py         # cached, concurrent TMDB client (optional)
+└── web/            # Flask app factory, template, static JS/CSS
+tests/              # unit + API tests on a synthetic catalogue (no dataset needed)
+reports/            # committed evaluation results
 ```
 
-### 6. Run the web app
+## Caveats
 
-```bash
-OPENBLAS_NUM_THREADS=1 python app/app.py
-```
+- **Genome leakage.** The tag genome was computed by GroupLens in 2023 from all data, so in the
+  temporal split it contains some information from after the cutoff. Real cold-start items would
+  need content features available at release, such as plot embeddings from TMDB overviews.
+- **Catalogue filter.** The 20-ratings filter runs on the full dataset, so the catalogue includes
+  movies that are cold at the cutoff but become popular later. That's deliberate (it creates the
+  cold-start test), but it means the catalogue itself "knows" those movies exist.
+- **Relevance = watched.** Any held-out rating counts as relevant, including low ones. The task is
+  "what will this user watch next", not "what will they rate highly".
+- Metrics use 5,000 sampled users per split (fixed seed). The genome covers 70% of the catalogue.
 
-Open [http://localhost:5000](http://localhost:5000).
+## Ideas for next steps
 
----
+- Learning-to-rank second stage (LightGBM LambdaRank over CF/content/recency/popularity features)
+- TMDB plot embeddings for genuine day-zero cold start
+- Recency-aware CF (time-decayed confidence), given how strong the recent-popularity baseline is
+- Hyperparameter sweep for ALS (factors, λ, α) on the validation window
 
-## Dataset
+## Acknowledgements
 
-F. Maxwell Harper and Joseph A. Konstan. 2015. The MovieLens Datasets: History and Context. *ACM Transactions on Interactive Intelligent Systems*, 5(4):19:1–19:19.
+Data: [MovieLens](https://grouplens.org/datasets/movielens/) by GroupLens Research (F. M. Harper &
+J. A. Konstan, 2015). Tag Genome: Vig, Sen & Riedl, 2012. Posters and overviews: [TMDB](https://www.themoviedb.org/).
+This product uses the TMDB API but is not endorsed or certified by TMDB.

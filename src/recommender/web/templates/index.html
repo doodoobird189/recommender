@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movie Recommender</title>
+  <meta name="description" content="Hybrid movie recommender: collaborative filtering (ALS) blended with the MovieLens tag genome." />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Movie Recommender</h1>
+    <p class="tagline">
+      Pick a few movies you love. A hybrid of <strong>collaborative filtering</strong>
+      (ALS on {{ "{:,}".format(n_interactions) }} MovieLens ratings) and the
+      <strong>tag genome</strong> finds what to watch next, and tells you why.
+    </p>
+  </header>
+
+  <main>
+    <!-- ── step 1: tell us your taste ─────────────────────────────────── -->
+    <section class="panel" id="picker">
+      <div class="panel-head">
+        <h2><span class="step">1</span> Movies you love</h2>
+        {% if has_sample_users %}
+        <button class="link-btn" id="sample-user" type="button">…or borrow a real MovieLens user's ratings</button>
+        {% endif %}
+      </div>
+
+      <div class="search">
+        <input id="search" type="search" placeholder="Search {{ '{:,}'.format(n_movies) }} movies…" autocomplete="off" aria-label="Search movies" />
+        <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+      </div>
+
+      <div id="selected" class="chips" aria-live="polite"></div>
+      <p id="sample-note" class="muted small" hidden></p>
+
+      <div class="grid-head">
+        <span class="muted small">Popular picks, click to add</span>
+        <button class="link-btn" id="shuffle" type="button">Shuffle ↻</button>
+      </div>
+      <div id="popular" class="poster-grid small-posters"></div>
+    </section>
+
+    <!-- ── step 2: blend + go ─────────────────────────────────────────── -->
+    <section class="panel controls">
+      <h2><span class="step">2</span> Tune the blend</h2>
+      <div class="slider-row">
+        <span class="slider-label" title="Recommend movies whose tag-genome profile matches your taste">Similar content</span>
+        <input id="blend" type="range" min="0" max="1" step="0.05" value="{{ default_cf_weight }}" aria-label="Collaborative filtering weight" />
+        <span class="slider-label" title="Recommend what people with similar taste loved">People like you</span>
+      </div>
+      <p class="muted small" id="blend-readout"></p>
+      <button id="go" class="primary" type="button" disabled>Pick at least 3 movies</button>
+    </section>
+
+    <!-- ── results ────────────────────────────────────────────────────── -->
+    <section class="panel" id="results" hidden>
+      <div class="panel-head">
+        <h2>Recommended for you</h2>
+      </div>
+      <div id="taste" class="taste"></div>
+      <div id="recs" class="poster-grid"></div>
+    </section>
+
+    <!-- ── how it works ───────────────────────────────────────────────── -->
+    <section class="panel" id="about">
+      <h2>How it works</h2>
+      <ol class="how">
+        <li><strong>Collaborative filtering.</strong> Implicit-feedback ALS learns a 64-d vector per movie from who watched what. Your picks are <em>folded in</em> to get your own vector instantly, without retraining.</li>
+        <li><strong>Content.</strong> Each movie has 1,128 tag-genome relevance scores ("dark", "time travel", "witty"…). Your picks form a taste profile, and movies are scored by cosine similarity to it.</li>
+        <li><strong>Hybrid.</strong> Both scores are rescaled so their top picks sit at 1 (raw ALS scores are heavy-tailed and would drown out content), then blended by the slider. Content lets niche and new movies surface even with little rating history. The default blend was tuned on a validation window, never on test data.</li>
+        <li><strong>Explanations.</strong> ALS scores decompose exactly into per-movie contributions, which gives the "Because you liked…" line. Shared tags come from the genome.</li>
+      </ol>
+      <div id="metrics"></div>
+    </section>
+  </main>
+
+  <footer>
+    Data: <a href="https://grouplens.org/datasets/movielens/" rel="noopener">MovieLens</a> (GroupLens).
+    Posters: <a href="https://www.themoviedb.org/" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB.
+  </footer>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
