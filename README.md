@@ -182,7 +182,10 @@ reports/            # committed evaluation results
 - Recency-aware CF (time-decayed confidence), given how strong the recent-popularity baseline is
 - Hyperparameter sweep for ALS (factors, λ, α) on the validation window
 
-## Acknowledgements
+## License & acknowledgements
+
+Code: [MIT](LICENSE). The MovieLens data is not included and is subject to GroupLens' own
+non-commercial terms.
 
 Data: [MovieLens](https://grouplens.org/datasets/movielens/) by GroupLens Research (F. M. Harper &
 J. A. Konstan, 2015). Tag Genome: Vig, Sen & Riedl, 2012. Posters and overviews: [TMDB](https://www.themoviedb.org/).
