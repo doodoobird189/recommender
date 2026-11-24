@@ -4,7 +4,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 [![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=uv&logoColor=white)](https://docs.astral.sh/uv/)
 ![Docker](https://img.shields.io/badge/docker-ready-2496ED)
-[![Live demo](https://img.shields.io/badge/demo-live-FFD21E?logo=huggingface&logoColor=black)](https://doodoobird189-movie-recommender.hf.space)
+[![Live demo](docs/badges/live-demo.svg)](https://doodoobird189-movie-recommender.hf.space)
 
 A movie recommender that blends **collaborative filtering** (implicit-feedback ALS on 32M MovieLens
 ratings) with a **content model** built on the MovieLens *Tag Genome*. Any visitor can pick a few
